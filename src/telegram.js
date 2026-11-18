@@ -137,7 +137,7 @@ async function handleCommand(text) {
 
   if (!symbol) {
     return sendMessage(
-      `⚠️ Cú pháp: ${command} AKEUSDT`
+      `⚠️ Cú pháp: ${command} BTCUSDT`
     );
   }
 
@@ -264,8 +264,7 @@ async function handleUpdate(update) {
 
     if (!symbol) {
       return sendMessage(
-        "⚠️ Gửi mã coin như AKEUSDT hoặc dùng /help."
-      );
+"⚠️ Gửi mã coin như BTCUSDT hoặc dùng /help."      );
     }
 
 return sendReport(await addSymbol(symbol));

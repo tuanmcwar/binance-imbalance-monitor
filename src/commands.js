@@ -1,6 +1,6 @@
 
 import { config } from "./config.js";
-import { getExchangeInfo,getBasis, errorText } from "./binance.js";
+import { getExchangeInfo, getBasis, errorText } from "./binance.js";
 import { fetchSnapshot, fetchFullReport, isScanning } from "./monitor.js";
 
 import {
@@ -95,7 +95,7 @@ function coinKeyboard(coins) {
             `${coin.paused ? "resume" : "pause"}:${coin.symbol}`
         },
         {
-          text: `🔍 Kiểm tra`,
+          text: "🔍 Kiểm tra",
           callback_data: `check:${coin.symbol}`
         },
         {
@@ -110,30 +110,29 @@ function coinKeyboard(coins) {
 
 export function helpText() {
   return [
-    "🤖 BINANCE IMBALANCE MONITOR V2",
+    "🤖 BINANCE IMBALANCE MONITOR",
     "━━━━━━━━━━━━━━━━━━",
     "",
     "📌 QUẢN LÝ COIN",
-    "/add AKEUSDT - Thêm coin",
-    "/remove AKEUSDT - Xóa coin",
+    "/add BTCUSDT - Thêm coin",
+    "/remove BTCUSDT - Xóa coin",
     "/list - Danh sách coin",
     "/clear - Xóa toàn bộ",
     "",
     "📊 THEO DÕI",
-    "/check AKEUSDT - Kiểm tra ngay",
-    "/pause AKEUSDT - Tạm dừng",
-    "/resume AKEUSDT - Tiếp tục",
+    "/check BTCUSDT - Kiểm tra ngay",
+    "/pause BTCUSDT - Tạm dừng",
+    "/resume BTCUSDT - Tiếp tục",
     "/status - Trạng thái bot",
     "/help - Hướng dẫn",
     "",
-    "Bạn cũng có thể gửi AKEUSDT để thêm coin.",
+    "Bạn cũng có thể gửi BTCUSDT để thêm coin.",
     "",
     `⏱ Quét mỗi ${config.intervalMinutes} phút`,
     `📚 ORDER BOOK ±${config.rangePercent}%`,
     `🚨 Cảnh báo khi Imbalance thay đổi > ${config.threshold} điểm %`
   ].join("\n");
 }
-
 
 export async function addSymbol(symbol) {
   if (getCoin(symbol)) {
@@ -177,7 +176,6 @@ export async function addSymbol(symbol) {
   ].join("\n");
 }
 
-
 export function removeSymbol(symbol) {
   return removeCoin(symbol)
     ? `🗑 Đã xóa ${symbol} khỏi danh sách.`
@@ -195,12 +193,14 @@ export function pauseSymbol(symbol) {
   return `⏸ Đã tạm dừng theo dõi ${symbol}.`;
 }
 
-
 export async function resumeSymbol(symbol) {
   const coin = getCoin(symbol);
 
   if (!coin) return `⚠️ ${symbol} chưa được theo dõi.`;
-  if (!coin.paused) return `🟢 ${symbol} đang hoạt động.`;
+
+  if (!coin.paused) {
+    return `🟢 ${symbol} đang hoạt động.`;
+  }
 
   const [snapshot, basis] = await Promise.all([
     fetchSnapshot(symbol),
@@ -238,7 +238,6 @@ export async function resumeSymbol(symbol) {
   ].join("\n");
 }
 
-
 export async function checkSymbol(symbol) {
   if (!(await isValidSymbol(symbol))) {
     return `❌ ${symbol} không hợp lệ hoặc chưa giao dịch.`;
@@ -272,6 +271,7 @@ export function statusResult() {
 
 export function clearResult() {
   const count = clearCoins();
+
   return `🗑 Đã xóa ${count} coin khỏi danh sách theo dõi.`;
 }
 
@@ -281,8 +281,14 @@ export function clearConfirmation() {
     reply_markup: {
       inline_keyboard: [
         [
-          { text: "🗑 Xác nhận xóa", callback_data: "clear:yes" },
-          { text: "❎ Hủy", callback_data: "menu:home" }
+          {
+            text: "🗑 Xác nhận xóa",
+            callback_data: "clear:yes"
+          },
+          {
+            text: "❎ Hủy",
+            callback_data: "menu:home"
+          }
         ]
       ]
     }
@@ -291,11 +297,11 @@ export function clearConfirmation() {
 
 export function menuResult(action) {
   const messages = {
-    add: "➕ Gửi lệnh /add AKEUSDT hoặc gửi trực tiếp AKEUSDT.",
-    remove: "➖ Gửi /remove AKEUSDT hoặc chọn ❌ trong /list.",
-    pause: "⏸ Gửi /pause AKEUSDT hoặc chọn coin trong /list.",
-    resume: "▶️ Gửi /resume AKEUSDT hoặc chọn coin trong /list.",
-    check: "🔍 Gửi /check AKEUSDT để xem báo cáo ngay."
+    add: "➕ Gửi lệnh /add BTCUSDT hoặc gửi trực tiếp BTCUSDT.",
+    remove: "➖ Gửi /remove BTCUSDT hoặc chọn ❌ trong /list.",
+    pause: "⏸ Gửi /pause BTCUSDT hoặc chọn coin trong /list.",
+    resume: "▶️ Gửi /resume BTCUSDT hoặc chọn coin trong /list.",
+    check: "🔍 Gửi /check BTCUSDT để xem báo cáo ngay."
   };
 
   return {
@@ -309,4 +315,3 @@ export function handleError(error) {
 
   return `❌ Lỗi: ${errorText(error)}`;
 }
-
