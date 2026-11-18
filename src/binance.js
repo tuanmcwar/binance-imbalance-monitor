@@ -53,7 +53,7 @@ export async function getFuturesPrice(symbol) {
 }
 
 // ==========================================
-// REALTIME BASIS
+// REALTIME BASIS + FUNDING RATE
 // Futures Last Price - Index Price
 // ==========================================
 
@@ -90,7 +90,9 @@ export async function getBasis(symbol) {
     !Number.isFinite(indexPrice) ||
     indexPrice <= 0
   ) {
-    throw new Error("Futures Price hoặc Index Price không hợp lệ");
+    throw new Error(
+      "Futures Price hoặc Index Price không hợp lệ"
+    );
   }
 
   const basis = futuresPrice - indexPrice;
@@ -99,15 +101,31 @@ export async function getBasis(symbol) {
   // với code cũ: nhân 100 khi hiển thị.
   const basisRate = basis / indexPrice;
 
+  // Funding Rate từ Binance premiumIndex.
+  // Giữ dạng thập phân, nhân 100 khi hiển thị.
+  const rawFunding = indexData.lastFundingRate;
+
+  const fundingRate =
+    rawFunding != null &&
+    rawFunding !== "" &&
+    Number.isFinite(Number(rawFunding))
+      ? Number(rawFunding)
+      : null;
+
   const timestamp = Date.now();
 
   return {
     pair: symbol,
     contractType: "PERPETUAL",
+
     basis: basis.toFixed(12),
     basisRate: basisRate.toFixed(12),
+
     futuresPrice: futuresPrice.toString(),
     indexPrice: indexPrice.toString(),
+
+    fundingRate,
+
     timestamp,
     period: "realtime",
     source: "LAST_INDEX"

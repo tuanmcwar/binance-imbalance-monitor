@@ -30,6 +30,9 @@ export function formatTime(timestamp) {
   });
 }
 
+// ==========================================
+// WALL FORMAT
+// ==========================================
 
 function formatWall(lines, title, wall) {
   lines.push(title);
@@ -46,6 +49,9 @@ function formatWall(lines, title, wall) {
   );
 }
 
+// ==========================================
+// MARKET REPORT
+// ==========================================
 
 export function formatReport(snapshot, basis, options = {}) {
   const lines = [];
@@ -90,12 +96,12 @@ export function formatReport(snapshot, basis, options = {}) {
     }
 
     if (basisTriggered) {
-  lines.push("📈 BASIS RATE TRIGGER");
-  lines.push(
-    `Mốc trước: ${percent(basisBaseline)} || Thay đổi: ${basisChange >= 0 ? "+" : ""}${basisChange.toFixed(2)} điểm %`
-  );
-  lines.push("");
-}
+      lines.push("📈 BASIS RATE TRIGGER");
+      lines.push(
+        `Mốc trước: ${percent(basisBaseline)} || Thay đổi: ${basisChange >= 0 ? "+" : ""}${basisChange.toFixed(2)} điểm %`
+      );
+      lines.push("");
+    }
 
     if (priceTriggered) {
       lines.push("🚀 PRICE PUMP TRIGGER");
@@ -122,19 +128,27 @@ export function formatReport(snapshot, basis, options = {}) {
   lines.push(`Giá: ${price(snapshot.currentPrice)} USDT`);
   lines.push("");
 
+  // ==========================================
+  // ORDER BOOK
+  // ==========================================
+
   lines.push(
     `📚 ORDER BOOK (±${snapshot.rangePercent}%)`
   );
+
   lines.push(
-  `🟢 BUY: ${Math.round(snapshot.buyTotal).toLocaleString("en-US")} USDT | 🔴 SELL: ${Math.round(snapshot.sellTotal).toLocaleString("en-US")} USDT`
-);
+    `🟢 BUY: ${Math.round(snapshot.buyTotal).toLocaleString("en-US")} USDT | 🔴 SELL: ${Math.round(snapshot.sellTotal).toLocaleString("en-US")} USDT`
+  );
+
   lines.push(
     `⚖️ Imbalance: ${percent(snapshot.imbalance)}`
   );
+
   lines.push("");
 
   formatWall(lines, "🟢 BUY WALL", snapshot.buyWall);
   lines.push("");
+
   formatWall(lines, "🔴 SELL WALL", snapshot.sellWall);
   lines.push("");
 
@@ -142,6 +156,22 @@ export function formatReport(snapshot, basis, options = {}) {
     `📚 Số mức BUY/SELL trong ±${snapshot.rangePercent}%: ` +
     `${snapshot.bidLevels}/${snapshot.askLevels}`
   );
+
+  // ==========================================
+  // FUNDING RATE
+  // ==========================================
+
+  const fundingRate =
+    basis?.fundingRate == null
+      ? NaN
+      : Number(basis.fundingRate);
+
+  const fundingText = Number.isFinite(fundingRate)
+    ? `${fundingRate >= 0 ? "+" : ""}${(fundingRate * 100).toFixed(4)}%`
+    : "N/A";
+
+  lines.push(`💸 Funding Rate: ${fundingText}`);
+
   lines.push("");
 
   // ==========================================
@@ -151,7 +181,6 @@ export function formatReport(snapshot, basis, options = {}) {
   lines.push("📈 BASIS (REALTIME)");
 
   if (basis) {
-    const basisValue = Number(basis.basis);
     const basisRate = Number(basis.basisRate);
     const futuresPrice = Number(basis.futuresPrice);
     const indexPrice = Number(basis.indexPrice);
@@ -159,12 +188,15 @@ export function formatReport(snapshot, basis, options = {}) {
     lines.push(
       `Basis Rate: ${percent(basisRate * 100)}`
     );
+
     lines.push(
       `Futures Price: ${price(futuresPrice)}`
     );
+
     lines.push(
       `Index Price: ${price(indexPrice)}`
     );
+
     lines.push(
       `Thời điểm lấy Basis: ${formatTime(basis.timestamp)}`
     );
