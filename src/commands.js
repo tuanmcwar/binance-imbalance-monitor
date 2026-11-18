@@ -130,7 +130,10 @@ export function helpText() {
     "",
     `⏱ Quét mỗi ${config.intervalMinutes} phút`,
     `📚 ORDER BOOK ±${config.rangePercent}%`,
-    `🚨 Cảnh báo khi Imbalance thay đổi > ${config.threshold} điểm %`
+    `🚨 Imbalance: > ${config.threshold} điểm %`,
+    `🚨 Basis Rate: ≥ ${config.basisThreshold} điểm %`,
+    `🚀 Price Pump: > ${config.priceThreshold ?? 10}% so với giá khi thêm`,
+    "🔀 Logic: OR"
   ].join("\n");
 }
 
@@ -158,7 +161,17 @@ export async function addSymbol(symbol) {
       ? rawRate * 100
       : null;
 
-  if (!addCoin(symbol, snapshot.imbalance, basisBaseline)) {
+  // Lưu giá Futures tại thời điểm thêm symbol
+  const priceBaseline = snapshot.currentPrice;
+
+  if (
+    !addCoin(
+      symbol,
+      snapshot.imbalance,
+      basisBaseline,
+      priceBaseline
+    )
+  ) {
     return `⚠️ ${symbol} đã được thêm bởi yêu cầu khác.`;
   }
 
@@ -169,9 +182,11 @@ export async function addSymbol(symbol) {
     `🔴 SELL Depth: ${snapshot.sellTotal.toFixed(2)} USDT`,
     `⚖️ Imbalance mốc: ${percent(snapshot.imbalance)}`,
     `📈 Basis Rate mốc: ${percent(basisBaseline)}`,
+    `💰 Giá Futures mốc: ${priceBaseline} USDT`,
     `⏱ Chu kỳ: ${config.intervalMinutes} phút`,
     `🚨 Imbalance: > ${config.threshold} điểm %`,
     `🚨 Basis Rate: ≥ ${config.basisThreshold} điểm %`,
+    `🚀 Price Pump: > ${config.priceThreshold ?? 10}%`,
     "🔀 Logic: OR"
   ].join("\n");
 }
@@ -226,6 +241,8 @@ export async function resumeSymbol(symbol) {
     paused: false,
     baseline: snapshot.imbalance,
     basisBaseline,
+    // Giữ nguyên priceBaseline khi tiếp tục
+    lastPrice: snapshot.currentPrice,
     lastImbalance: snapshot.imbalance,
     lastBasisRate: basisBaseline,
     lastScanAt: snapshot.timestamp
@@ -234,7 +251,8 @@ export async function resumeSymbol(symbol) {
   return [
     `▶️ ĐÃ TIẾP TỤC ${symbol}`,
     `⚖️ Imbalance mốc: ${percent(snapshot.imbalance)}`,
-    `📈 Basis Rate mốc: ${percent(basisBaseline)}`
+    `📈 Basis Rate mốc: ${percent(basisBaseline)}`,
+    `💰 Giá Futures gốc: ${latest.priceBaseline ?? "Chưa có"} USDT`
   ].join("\n");
 }
 

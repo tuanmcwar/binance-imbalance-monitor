@@ -116,6 +116,36 @@ async function scanCoin(symbol) {
       ? currentBasisRate - basisBaseline
       : null;
 
+  // ==========================================
+  // PRICE PUMP
+  // ==========================================
+
+  const rawPriceBaseline = record.priceBaseline;
+
+  const priceBaseline =
+    rawPriceBaseline != null &&
+    Number.isFinite(Number(rawPriceBaseline)) &&
+    Number(rawPriceBaseline) > 0
+      ? Number(rawPriceBaseline)
+      : null;
+
+  const currentPrice = snapshot?.currentPrice ?? null;
+
+  const priceChange =
+    currentPrice != null && priceBaseline != null
+      ? ((currentPrice - priceBaseline) / priceBaseline) * 100
+      : null;
+
+  const priceThreshold = config.priceThreshold ?? 10;
+
+  const priceTriggered =
+    priceChange != null &&
+    priceChange > priceThreshold;
+
+  // ==========================================
+  // ALERT CONDITIONS
+  // ==========================================
+
   const imbalanceTriggered =
     imbalanceChange != null &&
     Math.abs(imbalanceChange) > config.threshold;
@@ -124,19 +154,24 @@ async function scanCoin(symbol) {
     basisChange != null &&
     Math.abs(basisChange) >= config.basisThreshold;
 
+  const shouldAlert =
+    imbalanceTriggered ||
+    basisTriggered ||
+    priceTriggered;
+
   console.log(
     `[SCAN] ${symbol} | ` +
     `Imbalance=${snapshot?.imbalance?.toFixed(2) ?? "N/A"}% | ` +
     `Imbalance Change=${imbalanceChange?.toFixed(2) ?? "N/A"}pp | ` +
     `Basis=${currentBasisRate?.toFixed(2) ?? "N/A"}% | ` +
     `Basis Change=${basisChange?.toFixed(2) ?? "N/A"}pp | ` +
-    `Alert=${imbalanceTriggered || basisTriggered}`
+    `Price=${currentPrice ?? "N/A"} | ` +
+    `Price Change=${priceChange?.toFixed(2) ?? "N/A"}% | ` +
+    `Alert=${shouldAlert}`
   );
 
-  // Nếu một trong hai điều kiện thỏa mãn thì báo.
-  if (imbalanceTriggered || basisTriggered) {
-    // Báo cáo yêu cầu ORDER BOOK đầy đủ.
-    // Nếu thiếu snapshot, đợi lần quét tiếp theo.
+  if (shouldAlert) {
+    // Giữ yêu cầu có ORDER BOOK để gửi báo cáo.
     if (!snapshot) return;
 
     const latest = getCoin(symbol);
@@ -145,7 +180,8 @@ async function scanCoin(symbol) {
       !latest ||
       latest.paused ||
       latest.baseline !== record.baseline ||
-      latest.basisBaseline !== record.basisBaseline
+      latest.basisBaseline !== record.basisBaseline ||
+      latest.priceBaseline !== record.priceBaseline
     ) {
       return;
     }
@@ -154,13 +190,17 @@ async function scanCoin(symbol) {
       alert: true,
       imbalanceTriggered,
       basisTriggered,
+      priceTriggered,
       imbalanceChange,
       basisChange,
+      priceChange,
       imbalanceBaseline,
-      basisBaseline
+      basisBaseline,
+      priceBaseline,
+      currentPrice
     });
 
-    // Nếu Telegram gửi thất bại thì giữ mốc cũ.
+    // Telegram lỗi: giữ nguyên mốc để thử lại lần sau.
     await sendAlert(report);
 
     const afterSend = getCoin(symbol);
@@ -169,12 +209,17 @@ async function scanCoin(symbol) {
       afterSend &&
       !afterSend.paused &&
       afterSend.baseline === record.baseline &&
-      afterSend.basisBaseline === record.basisBaseline
+      afterSend.basisBaseline === record.basisBaseline &&
+      afterSend.priceBaseline === record.priceBaseline
     ) {
       updateCoin(symbol, {
         baseline: snapshot.imbalance,
         basisBaseline:
           currentBasisRate ?? basisBaseline,
+
+        // Không cập nhật priceBaseline
+        lastPrice: currentPrice,
+
         lastImbalance: snapshot.imbalance,
         lastBasisRate: currentBasisRate,
         lastScanAt: snapshot.timestamp,
@@ -186,21 +231,23 @@ async function scanCoin(symbol) {
     console.log(
       `[ALERT] ${symbol} | ` +
       `Imbalance=${imbalanceTriggered} | ` +
-      `Basis=${basisTriggered}`
+      `Basis=${basisTriggered} | ` +
+      `Price=${priceTriggered}`
     );
 
     return;
   }
 
-  // Không cảnh báo: chỉ cập nhật số liệu gần nhất.
-  // Không thay đổi baseline đã có.
+  // Không cảnh báo: cập nhật giá trị gần nhất,
+  // không thay đổi các baseline đã có.
   const latest = getCoin(symbol);
 
   if (
     !latest ||
     latest.paused ||
     latest.baseline !== record.baseline ||
-    latest.basisBaseline !== record.basisBaseline
+    latest.basisBaseline !== record.basisBaseline ||
+    latest.priceBaseline !== record.priceBaseline
   ) {
     return;
   }
@@ -211,13 +258,12 @@ async function scanCoin(symbol) {
 
   if (snapshot) {
     changes.lastImbalance = snapshot.imbalance;
+    changes.lastPrice = snapshot.currentPrice;
   }
 
   if (currentBasisRate != null) {
     changes.lastBasisRate = currentBasisRate;
 
-    // Coin được thêm từ phiên bản cũ chưa có
-    // basisBaseline: lấy giá trị đầu tiên làm mốc.
     if (basisBaseline == null) {
       changes.basisBaseline = currentBasisRate;
     }
@@ -257,7 +303,6 @@ export async function scanAll() {
     scanning = false;
   }
 }
-
 
 export function startMonitor(sendMessage) {
   if (timer) return;
@@ -302,6 +347,9 @@ export function startMonitor(sendMessage) {
   console.log("[MONITOR] Scan at minutes 14, 29, 44, 59");
   console.log(`[MONITOR] Imbalance > ${config.threshold} pp`);
   console.log(`[MONITOR] Basis Rate >= ${config.basisThreshold} pp`);
+  console.log(
+    `[MONITOR] Price Pump > ${config.priceThreshold ?? 10}%`
+  );
   console.log("[MONITOR] Alert logic: OR");
 }
 
@@ -309,4 +357,3 @@ export function stopMonitor() {
   if (timer) clearTimeout(timer);
   timer = null;
 }
-

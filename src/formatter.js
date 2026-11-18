@@ -48,53 +48,79 @@ function formatWall(lines, title, wall) {
 export function formatReport(snapshot, basis, options = {}) {
   const lines = [];
 
-  
-if (options.alert) {
-  const {
-    imbalanceTriggered,
-    basisTriggered,
-    imbalanceChange,
-    basisChange,
-    imbalanceBaseline,
-    basisBaseline
-  } = options;
+  // ==========================================
+  // ALERT HEADER
+  // ==========================================
 
-  lines.push("🚨 CẢNH BÁO BINANCE FUTURES");
-  lines.push("━━━━━━━━━━━━━━━━━━");
+  if (options.alert) {
+    const {
+      imbalanceTriggered,
+      basisTriggered,
+      priceTriggered,
+      imbalanceChange,
+      basisChange,
+      priceChange,
+      imbalanceBaseline,
+      basisBaseline,
+      priceBaseline,
+      currentPrice
+    } = options;
 
-  if (imbalanceTriggered && basisTriggered) {
-    lines.push("🔔 Nguyên nhân: IMBALANCE + BASIS RATE");
-  } else if (imbalanceTriggered) {
-    lines.push("🔔 Nguyên nhân: IMBALANCE");
-  } else if (basisTriggered) {
-    lines.push("🔔 Nguyên nhân: BASIS RATE");
-  }
+    lines.push("🚨 CẢNH BÁO BINANCE FUTURES");
+    lines.push("━━━━━━━━━━━━━━━━━━");
 
-  lines.push("");
+    const reasons = [];
 
-  if (imbalanceTriggered) {
-    lines.push("⚖️ IMBALANCE TRIGGER");
-    lines.push(
-      `Mốc trước: ${percent(imbalanceBaseline)}`
-    );
-    lines.push(
-      `Thay đổi: ${imbalanceChange >= 0 ? "+" : ""}${imbalanceChange.toFixed(2)} điểm %`
-    );
+    if (imbalanceTriggered) reasons.push("IMBALANCE");
+    if (basisTriggered) reasons.push("BASIS RATE");
+    if (priceTriggered) reasons.push("PRICE PUMP");
+
+    lines.push(`🔔 Nguyên nhân: ${reasons.join(" + ")}`);
     lines.push("");
+
+    if (imbalanceTriggered) {
+      lines.push("⚖️ IMBALANCE TRIGGER");
+      lines.push(
+        `Mốc trước: ${percent(imbalanceBaseline)}`
+      );
+      lines.push(
+        `Thay đổi: ${imbalanceChange >= 0 ? "+" : ""}${imbalanceChange.toFixed(2)} điểm %`
+      );
+      lines.push("");
+    }
+
+    if (basisTriggered) {
+      lines.push("📈 BASIS RATE TRIGGER");
+      lines.push(
+        `Mốc trước: ${percent(basisBaseline)}`
+      );
+      lines.push(
+        `Thay đổi: ${basisChange >= 0 ? "+" : ""}${basisChange.toFixed(2)} điểm %`
+      );
+      lines.push("");
+    }
+
+    if (priceTriggered) {
+      lines.push("🚀 PRICE PUMP TRIGGER");
+      lines.push(
+        `💰 Giá lúc thêm: ${price(priceBaseline)} USDT`
+      );
+      lines.push(
+        `💰 Giá hiện tại: ${price(currentPrice)} USDT`
+      );
+      lines.push(
+        `📈 Tăng giá: +${priceChange.toFixed(2)}%`
+      );
+      lines.push(
+        `🚨 Ngưỡng cảnh báo: > ${config.priceThreshold ?? 10}%`
+      );
+      lines.push("");
+    }
   }
 
-  if (basisTriggered) {
-    lines.push("📈 BASIS RATE TRIGGER");
-    lines.push(
-      `Mốc trước: ${percent(basisBaseline)}`
-    );
-    lines.push(
-      `Thay đổi: ${basisChange >= 0 ? "+" : ""}${basisChange.toFixed(2)} điểm %`
-    );
-    lines.push("");
-  }
-}
-
+  // ==========================================
+  // MARKET FLOW
+  // ==========================================
 
   lines.push("📊 BINANCE FUTURES MARKET FLOW");
   lines.push("━━━━━━━━━━━━━━━━━━");
@@ -133,6 +159,10 @@ if (options.alert) {
   );
   lines.push("");
 
+  // ==========================================
+  // BASIS
+  // ==========================================
+
   lines.push("📈 BASIS (REALTIME)");
 
   if (basis) {
@@ -167,6 +197,9 @@ if (options.alert) {
   return lines.join("\n");
 }
 
+// ==========================================
+// COIN LIST
+// ==========================================
 
 export function formatList(coins) {
   if (!coins.length) {
@@ -201,6 +234,37 @@ export function formatList(coins) {
       )}`
     );
 
+    const baselinePrice =
+      coin.priceBaseline == null
+        ? NaN
+        : Number(coin.priceBaseline);
+
+    const lastPrice =
+      coin.lastPrice == null
+        ? NaN
+        : Number(coin.lastPrice);
+
+    lines.push(
+      `   💰 Giá Futures gốc: ${price(baselinePrice)} USDT`
+    );
+
+    lines.push(
+      `   💰 Giá gần nhất: ${price(lastPrice)} USDT`
+    );
+
+    if (
+      Number.isFinite(baselinePrice) &&
+      baselinePrice > 0 &&
+      Number.isFinite(lastPrice)
+    ) {
+      const change =
+        ((lastPrice - baselinePrice) / baselinePrice) * 100;
+
+      lines.push(
+        `   🚀 Biến động giá: ${change >= 0 ? "+" : ""}${percent(change)}`
+      );
+    }
+
     lines.push(
       `   🕒 Lần quét: ${formatTime(coin.lastScanAt)}`
     );
@@ -215,6 +279,9 @@ export function formatList(coins) {
   return lines.join("\n");
 }
 
+// ==========================================
+// STATUS
+// ==========================================
 
 export function formatStatus(coins, startedAt, scanning) {
   const active = coins.filter(x => !x.paused).length;
@@ -224,8 +291,11 @@ export function formatStatus(coins, startedAt, scanning) {
     "━━━━━━━━━━━━━━━━━━",
     "🟢 Bot: ONLINE",
     `📡 Đang quét: ${scanning ? "Có" : "Không"}`,
-    `⏱ Chu kỳ: ${config.intervalMinutes} phút`,
-    `🚨 Ngưỡng: > ${config.threshold} điểm %`,
+    "⏱ Lịch quét: phút 14, 29, 44, 59",
+    `🚨 Imbalance: > ${config.threshold} điểm %`,
+    `🚨 Basis Rate: ≥ ${config.basisThreshold} điểm %`,
+    `🚀 Price Pump: > ${config.priceThreshold ?? 10}%`,
+    "🔀 Logic: OR",
     `📚 ORDER BOOK: ±${config.rangePercent}%`,
     `🪙 Tổng coin: ${coins.length}`,
     `🟢 Hoạt động: ${active}`,
@@ -233,4 +303,3 @@ export function formatStatus(coins, startedAt, scanning) {
     `🕒 Khởi động: ${formatTime(startedAt)}`
   ].join("\n");
 }
-

@@ -54,15 +54,25 @@ export function getCoins() {
   }));
 }
 
-
-export function addCoin(symbol, baseline, basisBaseline = null) {
+export function addCoin(
+  symbol,
+  baseline,
+  basisBaseline = null,
+  priceBaseline = null
+) {
   if (state[symbol]) return false;
 
   state[symbol] = {
     baseline,
     basisBaseline,
+
+    // Giá Futures tại thời điểm thêm symbol
+    priceBaseline,
+    lastPrice: priceBaseline,
+
     lastImbalance: baseline,
     lastBasisRate: basisBaseline,
+
     paused: false,
     addedAt: Date.now(),
     lastScanAt: Date.now(),
@@ -73,7 +83,6 @@ export function addCoin(symbol, baseline, basisBaseline = null) {
   saveState();
   return true;
 }
-
 
 export function updateCoin(symbol, changes) {
   if (!state[symbol]) return false;
@@ -101,4 +110,3 @@ export function clearCoins() {
   saveState();
   return count;
 }
-

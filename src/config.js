@@ -25,11 +25,19 @@ export const config = {
     process.env.BINANCE_REST || "https://fapi.binance.com",
 
   depthLimit,
+
   rangePercent: positiveNumber("ORDER_BOOK_RANGE_PERCENT", 10),
+
   intervalMinutes: positiveNumber("SCAN_INTERVAL_MINUTES", 5),
+
   threshold: positiveNumber("IMBALANCE_THRESHOLD", 10),
+
   timeout: positiveNumber("REQUEST_TIMEOUT_MS", 15000),
+
   basisThreshold: positiveNumber("BASIS_THRESHOLD", 1.5),
+
+  // Price Pump: tăng > 10% so với giá khi thêm symbol
+  priceThreshold: positiveNumber("PRICE_THRESHOLD", 10)
 };
 
 if (!config.telegramToken || !config.telegramChatId) {
@@ -38,7 +46,10 @@ if (!config.telegramToken || !config.telegramChatId) {
   );
 }
 
-if (config.rangePercent >= 100 || config.threshold > 200) {
+if (
+  config.rangePercent >= 100 ||
+  config.threshold > 200 ||
+  config.priceThreshold > 1000
+) {
   throw new Error("Phạm vi hoặc ngưỡng cảnh báo không hợp lệ");
 }
-
