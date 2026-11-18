@@ -30,6 +30,7 @@ export function formatTime(timestamp) {
   });
 }
 
+
 function formatWall(lines, title, wall) {
   lines.push(title);
 
@@ -39,11 +40,12 @@ function formatWall(lines, title, wall) {
   }
 
   lines.push(`💰 Giá: ${price(wall.price)}`);
-  lines.push(`💵 Giá trị: ${money(wall.notional)} USDT`);
+
   lines.push(
-    `📍 Khoảng cách: ${percent(wall.distancePercent)}`
+    `💵 Giá trị: ${Math.round(wall.notional).toLocaleString("en-US")} USDT | 📍 Khoảng cách: ${percent(wall.distancePercent)}`
   );
 }
+
 
 export function formatReport(snapshot, basis, options = {}) {
   const lines = [];
@@ -61,9 +63,7 @@ export function formatReport(snapshot, basis, options = {}) {
       basisChange,
       priceChange,
       imbalanceBaseline,
-      basisBaseline,
-      priceBaseline,
-      currentPrice
+      basisBaseline
     } = options;
 
     lines.push("🚨 CẢNH BÁO BINANCE FUTURES");
@@ -90,29 +90,17 @@ export function formatReport(snapshot, basis, options = {}) {
     }
 
     if (basisTriggered) {
-      lines.push("📈 BASIS RATE TRIGGER");
-      lines.push(
-        `Mốc trước: ${percent(basisBaseline)}`
-      );
-      lines.push(
-        `Thay đổi: ${basisChange >= 0 ? "+" : ""}${basisChange.toFixed(2)} điểm %`
-      );
-      lines.push("");
-    }
+  lines.push("📈 BASIS RATE TRIGGER");
+  lines.push(
+    `Mốc trước: ${percent(basisBaseline)} || Thay đổi: ${basisChange >= 0 ? "+" : ""}${basisChange.toFixed(2)} điểm %`
+  );
+  lines.push("");
+}
 
     if (priceTriggered) {
       lines.push("🚀 PRICE PUMP TRIGGER");
       lines.push(
-        `💰 Giá lúc thêm: ${price(priceBaseline)} USDT`
-      );
-      lines.push(
-        `💰 Giá hiện tại: ${price(currentPrice)} USDT`
-      );
-      lines.push(
         `📈 Tăng giá: +${priceChange.toFixed(2)}%`
-      );
-      lines.push(
-        `🚨 Ngưỡng cảnh báo: > ${config.priceThreshold ?? 10}%`
       );
       lines.push("");
     }
@@ -138,11 +126,8 @@ export function formatReport(snapshot, basis, options = {}) {
     `📚 ORDER BOOK (±${snapshot.rangePercent}%)`
   );
   lines.push(
-    `🟢 BUY Depth: ${money(snapshot.buyTotal)} USDT`
-  );
-  lines.push(
-    `🔴 SELL Depth: ${money(snapshot.sellTotal)} USDT`
-  );
+  `🟢 BUY: ${Math.round(snapshot.buyTotal).toLocaleString("en-US")} USDT | 🔴 SELL: ${Math.round(snapshot.sellTotal).toLocaleString("en-US")} USDT`
+);
   lines.push(
     `⚖️ Imbalance: ${percent(snapshot.imbalance)}`
   );
@@ -171,7 +156,6 @@ export function formatReport(snapshot, basis, options = {}) {
     const futuresPrice = Number(basis.futuresPrice);
     const indexPrice = Number(basis.indexPrice);
 
-    lines.push(`Basis: ${price(basisValue)}`);
     lines.push(
       `Basis Rate: ${percent(basisRate * 100)}`
     );
