@@ -25,7 +25,7 @@ export const config = {
     process.env.BINANCE_REST || "https://fapi.binance.com",
 
   depthLimit,
-  rangePercent: positiveNumber("ORDER_BOOK_RANGE_PERCENT", 10),
+  rangePercent: positiveNumber("ORDER_BOOK_RANGE_PERCENT", 20),
   intervalMinutes: positiveNumber("SCAN_INTERVAL_MINUTES", 5),
   threshold: positiveNumber("IMBALANCE_THRESHOLD", 10),
   timeout: positiveNumber("REQUEST_TIMEOUT_MS", 15000),

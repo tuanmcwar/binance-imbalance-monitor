@@ -258,33 +258,55 @@ export async function scanAll() {
   }
 }
 
+
 export function startMonitor(sendMessage) {
   if (timer) return;
 
   sendAlert = sendMessage;
 
-  const intervalMs =
-    config.intervalMinutes * 60 * 1000;
+  const scheduleNext = () => {
+    const now = Date.now();
+    const intervalMs = 15 * 60 * 1000;
+    const offsetMs = 14 * 60 * 1000;
 
-  timer = setInterval(() => {
-    scanAll().catch(error => {
-      console.error("[MONITOR ERROR]", errorText(error));
-    });
-  }, intervalMs);
+    const nextScan =
+      Math.floor((now - offsetMs) / intervalMs + 1) *
+      intervalMs + offsetMs;
 
-  console.log(
-    `[MONITOR] Every ${config.intervalMinutes} minutes`
-  );
-  console.log(
-    `[MONITOR] Imbalance > ${config.threshold} pp`
-  );
-  console.log(
-    `[MONITOR] Basis Rate >= ${config.basisThreshold} pp`
-  );
+    const delay = nextScan - now;
+
+    console.log(
+      `[MONITOR] Next scan: ${new Date(nextScan)
+        .toLocaleString("vi-VN", {
+          timeZone: "Asia/Ho_Chi_Minh",
+          hour12: false
+        })}`
+    );
+
+    timer = setTimeout(async () => {
+      try {
+        await scanAll();
+      } catch (error) {
+        console.error(
+          "[MONITOR ERROR]",
+          errorText(error)
+        );
+      } finally {
+        if (timer) scheduleNext();
+      }
+    }, delay);
+  };
+
+  scheduleNext();
+
+  console.log("[MONITOR] Scan at minutes 14, 29, 44, 59");
+  console.log(`[MONITOR] Imbalance > ${config.threshold} pp`);
+  console.log(`[MONITOR] Basis Rate >= ${config.basisThreshold} pp`);
   console.log("[MONITOR] Alert logic: OR");
 }
 
 export function stopMonitor() {
-  if (timer) clearInterval(timer);
+  if (timer) clearTimeout(timer);
   timer = null;
 }
+
