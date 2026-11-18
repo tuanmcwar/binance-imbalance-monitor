@@ -45,7 +45,7 @@ function formatWall(lines, title, wall) {
   lines.push(`💰 Giá: ${price(wall.price)}`);
 
   lines.push(
-    `💵 Giá trị: ${Math.round(wall.notional).toLocaleString("en-US")} USDT | 📍 Khoảng cách: ${percent(wall.distancePercent)}`
+    `💵 Giá trị: ${Math.round(wall.notional).toLocaleString("en-US")} USDT || 📍 Khoảng cách: ${percent(wall.distancePercent)}`
   );
 }
 
@@ -119,13 +119,11 @@ export function formatReport(snapshot, basis, options = {}) {
   lines.push("📊 BINANCE FUTURES MARKET FLOW");
   lines.push("━━━━━━━━━━━━━━━━━━");
   lines.push(`🪙 COIN: ${snapshot.symbol}`);
+  lines.push(`Giá: ${price(snapshot.currentPrice)} USDT`);
   lines.push(
     `🕒 Thời điểm quét: ${formatTime(snapshot.timestamp)}`
   );
-  lines.push("");
-
-  lines.push("💰 GIÁ FUTURES HIỆN TẠI");
-  lines.push(`Giá: ${price(snapshot.currentPrice)} USDT`);
+  
   lines.push("");
 
   // ==========================================
@@ -137,7 +135,7 @@ export function formatReport(snapshot, basis, options = {}) {
   );
 
   lines.push(
-    `🟢 BUY: ${Math.round(snapshot.buyTotal).toLocaleString("en-US")} USDT | 🔴 SELL: ${Math.round(snapshot.sellTotal).toLocaleString("en-US")} USDT`
+    `🟢 BUY: ${Math.round(snapshot.buyTotal).toLocaleString("en-US")} USDT || 🔴 SELL: ${Math.round(snapshot.sellTotal).toLocaleString("en-US")} USDT`
   );
 
   lines.push(
