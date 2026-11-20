@@ -313,7 +313,7 @@ export function startMonitor(sendMessage) {
   const scheduleNext = () => {
     const now = Date.now();
     const intervalMs = 15 * 60 * 1000;
-    const offsetMs = 15 * 60 * 1000;
+    const offsetMs = 14 * 60 * 1000;
 
     const nextScan =
       Math.floor((now - offsetMs) / intervalMs + 1) *
