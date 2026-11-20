@@ -17,6 +17,26 @@ import {
 
 import { formatReport } from "./formatter.js";
 
+import { checkBasisAlert } from "./alerts/basisAlert.js";
+
+import {
+  calculatePriceChange,
+  checkPriceAlert
+} from "./alerts/priceAlert.js";
+
+import {
+  calculateImbalanceChange,
+  checkImbalanceAlert
+} from "./alerts/imbalanceAlert.js";
+
+import { createBasisChart } from "./charts/basisChart.js";
+import { createPriceChart } from "./charts/priceChart.js";
+import { sendPhoto } from "./telegramApi.js";
+
+// ==========================================
+// MONITOR STATE
+// ==========================================
+
 let scanning = false;
 let timer = null;
 let sendAlert = null;
@@ -25,15 +45,23 @@ export function isScanning() {
   return scanning;
 }
 
+// ==========================================
+// HELPERS
+// ==========================================
+
 function toBasisPercent(basis) {
   if (basis?.basisRate == null) return null;
 
   const value = Number(basis.basisRate);
-  return Number.isFinite(value) ? value * 100 : null;
+
+  return Number.isFinite(value)
+    ? value * 100
+    : null;
 }
 
 export async function fetchSnapshot(symbol) {
   const { book, price } = await getSnapshotInputs(symbol);
+
   return analyzeOrderBook(symbol, book, price);
 }
 
@@ -48,9 +76,10 @@ export async function fetchFullReport(symbol) {
     throw snapshotResult.reason;
   }
 
-  const basis = basisResult.status === "fulfilled"
-    ? basisResult.value
-    : null;
+  const basis =
+    basisResult.status === "fulfilled"
+      ? basisResult.value
+      : null;
 
   if (basisResult.status === "rejected") {
     console.error(
@@ -62,10 +91,100 @@ export async function fetchFullReport(symbol) {
   return formatReport(snapshotResult.value, basis);
 }
 
+// ==========================================
+// CHECK RECORD
+// ==========================================
+
+function unchangedRecord(symbol, record) {
+  const latest = getCoin(symbol);
+
+  if (!latest || latest.paused) return null;
+
+  if (
+    latest.baseline !== record.baseline ||
+    latest.basisBaseline !== record.basisBaseline ||
+    latest.priceBaseline !== record.priceBaseline
+  ) {
+    return null;
+  }
+
+  return latest;
+}
+
+// ==========================================
+// SEND CHARTS
+// ==========================================
+
+async function sendTriggeredCharts(
+  symbol,
+  flags,
+  snapshot,
+  priceBaseline
+) {
+  const jobs = [
+    {
+      type: "BASIS RATE",
+      active: flags.basisTriggered,
+      make: () => createBasisChart(symbol)
+    },
+    {
+      type: "PRICE PUMP + ORDER BOOK",
+      active:
+        flags.priceTriggered ||
+        flags.imbalanceTriggered,
+      make: () => createPriceChart(
+        symbol,
+        priceBaseline,
+        snapshot
+      )
+    }
+  ];
+
+  for (const job of jobs) {
+    if (!job.active) continue;
+
+    try {
+      const png = await job.make();
+
+      await sendPhoto(png, {
+  caption: `📊 ${symbol} | ${job.type}`,
+
+  reply_markup: {
+    inline_keyboard: [
+      [
+        {
+          text: "📋 Danh sách coin",
+          callback_data: "menu:list"
+        }
+      ]
+    ]
+  }
+});
+
+      console.log(
+        `[CHART SENT] ${symbol} | ${job.type}`
+      );
+    } catch (error) {
+      console.error(
+        `[CHART ERROR] ${symbol} | ${job.type}:`,
+        errorText(error)
+      );
+    }
+  }
+}
+
+// ==========================================
+// SCAN ONE COIN
+// ==========================================
+
 async function scanCoin(symbol) {
   const record = getCoin(symbol);
 
   if (!record || record.paused) return;
+
+  // ========================================
+  // FETCH DATA
+  // ========================================
 
   const [snapshotResult, basisResult] =
     await Promise.allSettled([
@@ -73,13 +192,15 @@ async function scanCoin(symbol) {
       getBasis(symbol)
     ]);
 
-  const snapshot = snapshotResult.status === "fulfilled"
-    ? snapshotResult.value
-    : null;
+  const snapshot =
+    snapshotResult.status === "fulfilled"
+      ? snapshotResult.value
+      : null;
 
-  const basis = basisResult.status === "fulfilled"
-    ? basisResult.value
-    : null;
+  const basis =
+    basisResult.status === "fulfilled"
+      ? basisResult.value
+      : null;
 
   if (snapshotResult.status === "rejected") {
     console.error(
@@ -95,30 +216,54 @@ async function scanCoin(symbol) {
     );
   }
 
+  // ========================================
+  // IMBALANCE
+  // ========================================
+
   const currentBasisRate = toBasisPercent(basis);
 
   const imbalanceBaseline = Number(record.baseline);
 
-  const imbalanceChange =
-    snapshot && Number.isFinite(imbalanceBaseline)
-      ? snapshot.imbalance - imbalanceBaseline
-      : null;
+  const imbalanceChange = snapshot
+    ? calculateImbalanceChange(
+        snapshot.imbalance,
+        imbalanceBaseline
+      )
+    : null;
+
+  const imbalanceTriggered = snapshot
+    ? checkImbalanceAlert(
+        imbalanceChange,
+        config.threshold
+      )
+    : false;
+
+  // ========================================
+  // BASIS RATE
+  // ========================================
 
   const oldBasis = record.basisBaseline;
 
   const basisBaseline =
-    oldBasis != null && Number.isFinite(Number(oldBasis))
+    oldBasis != null &&
+    Number.isFinite(Number(oldBasis))
       ? Number(oldBasis)
       : null;
 
   const basisChange =
-    currentBasisRate != null && basisBaseline != null
+    currentBasisRate != null &&
+    basisBaseline != null
       ? currentBasisRate - basisBaseline
       : null;
 
-  // ==========================================
+  const basisTriggered =
+    currentBasisRate != null
+      ? checkBasisAlert(currentBasisRate)
+      : false;
+
+  // ========================================
   // PRICE PUMP
-  // ==========================================
+  // ========================================
 
   const rawPriceBaseline = record.priceBaseline;
 
@@ -131,29 +276,21 @@ async function scanCoin(symbol) {
 
   const currentPrice = snapshot?.currentPrice ?? null;
 
-  const priceChange =
-    currentPrice != null && priceBaseline != null
-      ? ((currentPrice - priceBaseline) / priceBaseline) * 100
-      : null;
+  const priceChange = calculatePriceChange(
+    currentPrice,
+    priceBaseline
+  );
 
-  const priceThreshold = config.priceThreshold ?? 10;
+  const priceTriggered = snapshot
+    ? checkPriceAlert(
+        priceChange,
+        config.priceThreshold ?? 10
+      )
+    : false;
 
-  const priceTriggered =
-    priceChange != null &&
-    priceChange > priceThreshold;
-
-  // ==========================================
+  // ========================================
   // ALERT CONDITIONS
-  // ==========================================
-
-  const imbalanceTriggered =
-    imbalanceChange != null &&
-    Math.abs(imbalanceChange) > config.threshold;
-
-  const basisTriggered =
-  currentBasisRate != null &&
-  currentBasisRate >= -1.99 &&
-  currentBasisRate <= 0;
+  // ========================================
 
   const shouldAlert =
     imbalanceTriggered ||
@@ -171,61 +308,98 @@ async function scanCoin(symbol) {
     `Alert=${shouldAlert}`
   );
 
+  // ========================================
+  // SEND ALERT
+  // ========================================
+
   if (shouldAlert) {
-    // Giữ yêu cầu có ORDER BOOK để gửi báo cáo.
-    if (!snapshot) return;
-
-    const latest = getCoin(symbol);
-
     if (
-      !latest ||
-      latest.paused ||
-      latest.baseline !== record.baseline ||
-      latest.basisBaseline !== record.basisBaseline ||
-      latest.priceBaseline !== record.priceBaseline
+      !snapshot ||
+      !unchangedRecord(symbol, record)
     ) {
       return;
     }
 
-    const report = formatReport(snapshot, basis, {
-      alert: true,
-      imbalanceTriggered,
-      basisTriggered,
-      priceTriggered,
-      imbalanceChange,
-      basisChange,
-      priceChange,
-      imbalanceBaseline,
-      basisBaseline,
-      priceBaseline,
-      currentPrice
-    });
+    // ======================================
+    // OPTIONAL TEXT ALERT
+    // ======================================
 
-    // Telegram lỗi: giữ nguyên mốc để thử lại lần sau.
-    await sendAlert(report);
+    if (config.sendAlertText) {
+      const report = formatReport(
+        snapshot,
+        basis,
+        {
+          alert: true,
+          imbalanceTriggered,
+          basisTriggered,
+          priceTriggered,
+          imbalanceChange,
+          basisChange,
+          priceChange,
+          imbalanceBaseline,
+          basisBaseline,
+          priceBaseline,
+          currentPrice
+        }
+      );
 
-    const afterSend = getCoin(symbol);
+      if (typeof sendAlert !== "function") {
+        throw new Error(
+          "Monitor chưa có hàm gửi Telegram"
+        );
+      }
 
-    if (
-      afterSend &&
-      !afterSend.paused &&
-      afterSend.baseline === record.baseline &&
-      afterSend.basisBaseline === record.basisBaseline &&
-      afterSend.priceBaseline === record.priceBaseline
-    ) {
+      await sendAlert(report);
+
+      console.log(
+        `[TEXT SENT] ${symbol} | MARKET FLOW`
+      );
+    } else {
+      console.log(
+        `[TEXT SKIPPED] ${symbol} | SEND_ALERT_TEXT=false`
+      );
+    }
+
+    // ======================================
+    // SEND TRIGGERED CHARTS
+    // ======================================
+
+    await sendTriggeredCharts(
+      symbol,
+      {
+        basisTriggered,
+        priceTriggered,
+        imbalanceTriggered
+      },
+      snapshot,
+      priceBaseline
+    );
+
+    // ======================================
+    // UPDATE BASELINES
+    // ======================================
+
+    const afterSend = unchangedRecord(
+      symbol,
+      record
+    );
+
+    if (afterSend) {
       updateCoin(symbol, {
         baseline: snapshot.imbalance,
+
         basisBaseline:
           currentBasisRate ?? basisBaseline,
 
-        // Không cập nhật priceBaseline
+        // Không reset priceBaseline
         lastPrice: currentPrice,
-
         lastImbalance: snapshot.imbalance,
         lastBasisRate: currentBasisRate,
         lastScanAt: snapshot.timestamp,
         lastAlertAt: Date.now(),
-        alertCount: (afterSend.alertCount || 0) + 1
+
+        alertCount:
+          (afterSend.alertCount || 0) + 1
       });
     }
 
@@ -239,19 +413,11 @@ async function scanCoin(symbol) {
     return;
   }
 
-  // Không cảnh báo: cập nhật giá trị gần nhất,
-  // không thay đổi các baseline đã có.
-  const latest = getCoin(symbol);
+  // ========================================
+  // NO ALERT - UPDATE LATEST DATA
+  // ========================================
 
-  if (
-    !latest ||
-    latest.paused ||
-    latest.baseline !== record.baseline ||
-    latest.basisBaseline !== record.basisBaseline ||
-    latest.priceBaseline !== record.priceBaseline
-  ) {
-    return;
-  }
+  if (!unchangedRecord(symbol, record)) return;
 
   const changes = {
     lastScanAt: Date.now()
@@ -273,16 +439,24 @@ async function scanCoin(symbol) {
   updateCoin(symbol, changes);
 }
 
+// ==========================================
+// SCAN ALL COINS
+// ==========================================
+
 export async function scanAll() {
   if (scanning) {
-    console.log("[MONITOR] Bỏ qua chu kỳ quét chồng");
+    console.log(
+      "[MONITOR] Bỏ qua chu kỳ quét chồng"
+    );
     return;
   }
 
   scanning = true;
 
   try {
-    const coins = getCoins().filter(x => !x.paused);
+    const coins = getCoins().filter(
+      coin => !coin.paused
+    );
 
     if (!coins.length) return;
 
@@ -305,6 +479,10 @@ export async function scanAll() {
   }
 }
 
+// ==========================================
+// START MONITOR
+// ==========================================
+
 export function startMonitor(sendMessage) {
   if (timer) return;
 
@@ -312,21 +490,34 @@ export function startMonitor(sendMessage) {
 
   const scheduleNext = () => {
     const now = Date.now();
-    const intervalMs = 15 * 60 * 1000;
-    const offsetMs = 14 * 60 * 1000;
+
+    const intervalMs =
+      config.intervalMinutes * 60 * 1000;
+
+    const offsetMinutes =
+      config.scanOffsetMinutes %
+      config.intervalMinutes;
+
+    const offsetMs =
+      offsetMinutes * 60 * 1000;
 
     const nextScan =
-      Math.floor((now - offsetMs) / intervalMs + 1) *
-      intervalMs + offsetMs;
+      Math.floor(
+        (now - offsetMs) / intervalMs + 1
+      ) * intervalMs + offsetMs;
 
     const delay = nextScan - now;
 
     console.log(
-      `[MONITOR] Next scan: ${new Date(nextScan)
-        .toLocaleString("vi-VN", {
-          timeZone: "Asia/Ho_Chi_Minh",
-          hour12: false
-        })}`
+      `[MONITOR] Next scan: ${
+        new Date(nextScan).toLocaleString(
+          "vi-VN",
+          {
+            timeZone: "Asia/Ho_Chi_Minh",
+            hour12: false
+          }
+        )
+      }`
     );
 
     timer = setTimeout(async () => {
@@ -338,23 +529,52 @@ export function startMonitor(sendMessage) {
           errorText(error)
         );
       } finally {
-        if (timer) scheduleNext();
+        if (timer) {
+          scheduleNext();
+        }
       }
     }, delay);
   };
 
   scheduleNext();
 
-  console.log("[MONITOR] Scan at minutes 14, 29, 44, 59");
-  console.log(`[MONITOR] Imbalance > ${config.threshold} pp`);
-  console.log("[MONITOR] Basis Rate: -1.99% to 0%");
   console.log(
-    `[MONITOR] Price Pump > ${config.priceThreshold ?? 10}%`
+    `[MONITOR] Scan interval: ${config.intervalMinutes} minutes`
   );
-  console.log("[MONITOR] Alert logic: OR");
+
+  console.log(
+    `[MONITOR] Scan offset: ${config.scanOffsetMinutes} minutes`
+  );
+
+  console.log(
+    `[MONITOR] Imbalance threshold: ${config.threshold} pp`
+  );
+
+  console.log(
+    `[MONITOR] Basis Rate: ${config.basisAlertMin}% to ${config.basisAlertMax}%`
+  );
+
+  console.log(
+    `[MONITOR] Price Pump threshold: ${config.priceThreshold}%`
+  );
+
+  console.log(
+    `[MONITOR] SEND_ALERT_TEXT=${config.sendAlertText}`
+  );
+
+  console.log(
+    "[MONITOR] Alert logic: OR"
+  );
 }
 
+// ==========================================
+// STOP MONITOR
+// ==========================================
+
 export function stopMonitor() {
-  if (timer) clearTimeout(timer);
+  if (timer) {
+    clearTimeout(timer);
+  }
+
   timer = null;
 }

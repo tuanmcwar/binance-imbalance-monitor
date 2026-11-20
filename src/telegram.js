@@ -1,6 +1,6 @@
 
-import axios from "axios";
 import { config } from "./config.js";
+import { telegram, sendMessage, sendPhoto } from "./telegramApi.js";
 
 import {
   normalizeSymbol,
@@ -19,36 +19,14 @@ import {
   handleError
 } from "./commands.js";
 
-const telegram = axios.create({
-  baseURL: `https://api.telegram.org/bot${config.telegramToken}`,
-  timeout: 35000
-});
+export { sendMessage, sendPhoto };
 
 let running = false;
 let offset = 0;
 
 // ==========================================
-// SEND MESSAGE
-// ==========================================
-
-export async function sendMessage(text, options = {}) {
-  const { data } = await telegram.post("/sendMessage", {
-    chat_id: config.telegramChatId,
-    text,
-    ...options
-  });
-
-  if (!data.ok) {
-    throw new Error(data.description || "Telegram gửi lỗi");
-  }
-
-  return data.result;
-}
-
-// ==========================================
 // SEND REPORT + MENU BUTTON
 // ==========================================
-
 
 export async function sendReport(text) {
   return sendMessage(text, {
@@ -64,7 +42,6 @@ export async function sendReport(text) {
     }
   });
 }
-
 
 // ==========================================
 // CALLBACK
@@ -141,9 +118,9 @@ async function handleCommand(text) {
     );
   }
 
- if (command === "/add") {
-  return sendReport(await addSymbol(symbol));
-}
+  if (command === "/add") {
+    return sendReport(await addSymbol(symbol));
+  }
 
   if (command === "/remove" || command === "/stop") {
     return sendMessage(removeSymbol(symbol));
@@ -157,7 +134,6 @@ async function handleCommand(text) {
     return sendMessage(await resumeSymbol(symbol));
   }
 
-  // /check gửi báo cáo có nút Menu
   if (command === "/check") {
     return sendReport(await checkSymbol(symbol));
   }
@@ -225,7 +201,6 @@ async function handleCallback(callback) {
     return sendResult(listResult());
   }
 
-  // Nút kiểm tra coin gửi báo cáo có Menu
   if (action === "check") {
     return sendReport(await checkSymbol(symbol));
   }
@@ -264,10 +239,12 @@ async function handleUpdate(update) {
 
     if (!symbol) {
       return sendMessage(
-"⚠️ Gửi mã coin như BTCUSDT hoặc dùng /help."      );
+        "⚠️ Gửi mã coin như BTCUSDT hoặc dùng /help."
+      );
     }
 
-return sendReport(await addSymbol(symbol));
+    return sendReport(await addSymbol(symbol));
+
   } catch (error) {
     return sendMessage(handleError(error));
   }
@@ -301,6 +278,7 @@ export async function startTelegram() {
         });
 
         initialized = true;
+
         console.log("✅ TELEGRAM CONNECTED");
       }
 

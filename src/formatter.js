@@ -1,6 +1,18 @@
 
 import { config } from "./config.js";
 
+import {
+  formatBasisTrigger
+} from "./alerts/basisAlert.js";
+
+import {
+  formatPriceTrigger
+} from "./alerts/priceAlert.js";
+
+import {
+  formatImbalanceTrigger
+} from "./alerts/imbalanceAlert.js";
+
 export function money(value) {
   if (!Number.isFinite(value)) return "N/A";
 
@@ -66,10 +78,8 @@ export function formatReport(snapshot, basis, options = {}) {
       basisTriggered,
       priceTriggered,
       imbalanceChange,
-      basisChange,
       priceChange,
-      imbalanceBaseline,
-      basisBaseline
+      imbalanceBaseline
     } = options;
 
     lines.push("🚨 CẢNH BÁO BINANCE FUTURES");
@@ -84,31 +94,36 @@ export function formatReport(snapshot, basis, options = {}) {
     lines.push(`🔔 Nguyên nhân: ${reasons.join(" + ")}`);
     lines.push("");
 
+    // IMBALANCE
     if (imbalanceTriggered) {
-      lines.push("⚖️ IMBALANCE TRIGGER");
       lines.push(
-        `Mốc trước: ${percent(imbalanceBaseline)}`
+        formatImbalanceTrigger(
+          imbalanceBaseline,
+          imbalanceChange
+        )
       );
-      lines.push(
-        `Thay đổi: ${imbalanceChange >= 0 ? "+" : ""}${imbalanceChange.toFixed(2)} điểm %`
-      );
+
       lines.push("");
     }
 
+    // BASIS RATE
     if (basisTriggered) {
-  lines.push("📈 BASIS RATE TRIGGER");
-  lines.push(
-    `Basis Rate hiện tại: ${percent(Number(basis.basisRate) * 100)}`
-  );
-  lines.push("Điều kiện: -1.99% đến 0%");
-  lines.push("");
-}
+      const currentBasisRate =
+        Number(basis.basisRate) * 100;
 
-    if (priceTriggered) {
-      lines.push("🚀 PRICE PUMP TRIGGER");
       lines.push(
-        `📈 Tăng giá: +${priceChange.toFixed(2)}%`
+        formatBasisTrigger(currentBasisRate)
       );
+
+      lines.push("");
+    }
+
+    // PRICE PUMP
+    if (priceTriggered) {
+      lines.push(
+        formatPriceTrigger(priceChange)
+      );
+
       lines.push("");
     }
   }
@@ -121,10 +136,11 @@ export function formatReport(snapshot, basis, options = {}) {
   lines.push("━━━━━━━━━━━━━━━━━━");
   lines.push(`🪙 COIN: ${snapshot.symbol}`);
   lines.push(`Giá: ${price(snapshot.currentPrice)} USDT`);
+
   lines.push(
     `🕒 Thời điểm quét: ${formatTime(snapshot.timestamp)}`
   );
-  
+
   lines.push("");
 
   // ==========================================
