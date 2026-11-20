@@ -151,8 +151,9 @@ async function scanCoin(symbol) {
     Math.abs(imbalanceChange) > config.threshold;
 
   const basisTriggered =
-    basisChange != null &&
-    Math.abs(basisChange) >= config.basisThreshold;
+  currentBasisRate != null &&
+  currentBasisRate >= -1.99 &&
+  currentBasisRate <= 0;
 
   const shouldAlert =
     imbalanceTriggered ||
@@ -312,7 +313,7 @@ export function startMonitor(sendMessage) {
   const scheduleNext = () => {
     const now = Date.now();
     const intervalMs = 15 * 60 * 1000;
-    const offsetMs = 14 * 60 * 1000;
+    const offsetMs = 15 * 60 * 1000;
 
     const nextScan =
       Math.floor((now - offsetMs) / intervalMs + 1) *
@@ -346,7 +347,7 @@ export function startMonitor(sendMessage) {
 
   console.log("[MONITOR] Scan at minutes 14, 29, 44, 59");
   console.log(`[MONITOR] Imbalance > ${config.threshold} pp`);
-  console.log(`[MONITOR] Basis Rate >= ${config.basisThreshold} pp`);
+  console.log("[MONITOR] Basis Rate: -1.99% to 0%");
   console.log(
     `[MONITOR] Price Pump > ${config.priceThreshold ?? 10}%`
   );

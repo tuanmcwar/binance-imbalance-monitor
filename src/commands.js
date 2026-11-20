@@ -131,7 +131,7 @@ export function helpText() {
     `⏱ Quét mỗi ${config.intervalMinutes} phút`,
     `📚 ORDER BOOK ±${config.rangePercent}%`,
     `🚨 Imbalance: > ${config.threshold} điểm %`,
-    `🚨 Basis Rate: ≥ ${config.basisThreshold} điểm %`,
+    "🚨 Basis Rate: -1.99% đến 0%",
     `🚀 Price Pump: > ${config.priceThreshold ?? 10}% so với giá khi thêm`,
     "🔀 Logic: OR"
   ].join("\n");
@@ -181,11 +181,11 @@ export async function addSymbol(symbol) {
     `🟢 BUY Depth: ${snapshot.buyTotal.toFixed(2)} USDT`,
     `🔴 SELL Depth: ${snapshot.sellTotal.toFixed(2)} USDT`,
     `⚖️ Imbalance mốc: ${percent(snapshot.imbalance)}`,
-    `📈 Basis Rate mốc: ${percent(basisBaseline)}`,
+    `📈 Basis Rate lúc thêm/tiếp tục: ${percent(basisBaseline)}`,
     `💰 Giá Futures mốc: ${priceBaseline} USDT`,
     `⏱ Chu kỳ: ${config.intervalMinutes} phút`,
     `🚨 Imbalance: > ${config.threshold} điểm %`,
-    `🚨 Basis Rate: ≥ ${config.basisThreshold} điểm %`,
+    "🚨 Basis Rate: -1.99% đến 0%",
     `🚀 Price Pump: > ${config.priceThreshold ?? 10}%`,
     "🔀 Logic: OR"
   ].join("\n");
@@ -251,7 +251,7 @@ export async function resumeSymbol(symbol) {
   return [
     `▶️ ĐÃ TIẾP TỤC ${symbol}`,
     `⚖️ Imbalance mốc: ${percent(snapshot.imbalance)}`,
-    `📈 Basis Rate mốc: ${percent(basisBaseline)}`,
+    `📈 Basis Rate lúc thêm/tiếp tục: ${percent(basisBaseline)}`,
     `💰 Giá Futures gốc: ${latest.priceBaseline ?? "Chưa có"} USDT`
   ].join("\n");
 }

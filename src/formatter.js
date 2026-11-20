@@ -96,12 +96,13 @@ export function formatReport(snapshot, basis, options = {}) {
     }
 
     if (basisTriggered) {
-      lines.push("📈 BASIS RATE TRIGGER");
-      lines.push(
-        `Mốc trước: ${percent(basisBaseline)} || Thay đổi: ${basisChange >= 0 ? "+" : ""}${basisChange.toFixed(2)} điểm %`
-      );
-      lines.push("");
-    }
+  lines.push("📈 BASIS RATE TRIGGER");
+  lines.push(
+    `Basis Rate hiện tại: ${percent(Number(basis.basisRate) * 100)}`
+  );
+  lines.push("Điều kiện: -1.99% đến 0%");
+  lines.push("");
+}
 
     if (priceTriggered) {
       lines.push("🚀 PRICE PUMP TRIGGER");
@@ -307,7 +308,7 @@ export function formatStatus(coins, startedAt, scanning) {
     `📡 Đang quét: ${scanning ? "Có" : "Không"}`,
     "⏱ Lịch quét: phút 14, 29, 44, 59",
     `🚨 Imbalance: > ${config.threshold} điểm %`,
-    `🚨 Basis Rate: ≥ ${config.basisThreshold} điểm %`,
+    "🚨 Basis Rate: -1.99% đến 0%",
     `🚀 Price Pump: > ${config.priceThreshold ?? 10}%`,
     "🔀 Logic: OR",
     `📚 ORDER BOOK: ±${config.rangePercent}%`,
